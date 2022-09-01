@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    secrets:
+      - mysql_root_password
+      - mysql_user_password
+    environment:
+      MYSQL_DATABASE: db
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_USER: user
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_user_password
+    healthcheck:
+        test: ["CMD-SHELL", "mysqladmin ping -u root -p$$(cat /run/secrets/mysql_root_password) -h localhost && mysql -u root -p$$(cat /run/secrets/mysql_root_password) -e 'USE db;'"]
+        start_period: 20s
+        timeout: 30s
+        retries: 3
+    cap_add:
+    - SYS_NICE  # CAP_SYS_NICE
+    networks:
+      - local
+
+
+  redis:
+    image: redis:7.0.4
+    command: ["bash", "-c", 'docker-entrypoint.sh --requirepass "$$(cat /run/secrets/redis_password)"']
+    ports:
+     - "6379:6379"
+    secrets:
+      - redis_password
+    volumes:
+      - redis-data:/data
+      # - redis-conf:/usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli -a $$(cat /run/secrets/redis_password) --raw incr ping" ]
+    networks:
+      - local
+
+  mongo:
+    image: mongo:5.0.11-focal
+    # deploy:
+    #   restart_policy:
+    #     condition: any
+    #     delay: 2s
+    #     max_attempts: 4
+    #     window: 120s
+    ports:
+      - "27017:27017"
+    secrets:
+      - mongo_root_password
+    environment:
+      MONGO_INITDB_DATABASE: db
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - local
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      interval: 30s
+      start_period: 30s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3.10.7-management-alpine
+    ports:
+        - 5672:5672
+        - 15672:15672
+    volumes:
+        - rabbitmq-data:/var/lib/rabbitmq/
+    healthcheck:
+        test: ["CMD-SHELL", "rabbitmq-diagnostics", "-q", "status"]
+        interval: 30s
+        start_period: 30s
+        retries: 3
+    networks:
+        - local
+
+secrets:
+  mysql_root_password:
+    file: mysql_root_passwd.txt
+  mysql_user_password:
+    file: mysql_user_passwd.txt
+  redis_password:
+    file: redis_passwd.txt
+  mongo_root_password:
+    file: mongo_root_passwd.txt
+
+volumes:
+  mysql-data: {}
+  mongo-data: {}
+  redis-data: {}
+  rabbitmq-data: {}
+
+
+networks:
+  local:
+    driver: overlay
