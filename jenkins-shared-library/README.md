@@ -2,7 +2,7 @@
 
 ## About
 
-This shared library fetches docker image names and tags from a given registry by using docker registry API and returns the result as jenkins build parameters
+A jenkins shared library that fetches docker image names and tags from a given registry by using docker registry API and returns the result as jenkins build parameters
 
 Like this:
 ![screen-gif](./fetch-docker-images.gif)
