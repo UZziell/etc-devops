@@ -1,0 +1,3 @@
+@Library('jenkins-shared-library') _
+
+loadBuildParams('web-au-console', 'https://hub.docker.com', 'docker-credential')
