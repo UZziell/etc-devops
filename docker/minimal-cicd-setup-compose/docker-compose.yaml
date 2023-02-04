@@ -1,41 +1,53 @@
 version: '3.8'
 
 services:
-  # gitlab:
-  #   image: 'gitlab/gitlab-ee:15.8.1-ce.0'
-  #   restart: always
-  #   hostname: 'gitlab.internal.domain'
-  #   environment:
-  #     GITLAB_OMNIBUS_CONFIG: |
-  #       external_url 'https://gitlab.internal.domain'
-  #       # Add any other gitlab.rb configuration here, each on its own line
-  #   # ports:
-  #   #   - '80:80'
-  #   #   - '443:443'
-  #   #   - '22:22'
-  #   volumes:
-  #     - 'gitlab-config:/config:/etc/gitlab'
-  #     - 'gitlab-logs/logs:/var/log/gitlab'
-  #     - 'gitlab-data/data:/var/opt/gitlab'
-  #   shm_size: '256m'
-
+  gitlab:
+    image: gitlab/gitlab-ce:15.8.1-ce.0
+    restart: always
+    hostname: 'gitlab.local'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.local'
+        # Add any other gitlab.rb configuration here, each on its own line
+    expose:
+      - 80
+      - 443
+      - 22
+    volumes:
+      - 'gitlab-config:/etc/gitlab'
+      - 'gitlab-logs:/var/log/gitlab'
+      - 'gitlab-data:/var/opt/gitlab'
+    shm_size: '256m'
 
   jenkins:
     image: jenkins/jenkins:2.389-jdk11
     restart: unless-stopped
-    # ports:
-    #   - "8080:8080"
-    #   - "50000:50000"
+    expose:
+      - 8080
+      - 50000
     volumes:
       - jenkins-data:/var/jenkins_home
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:8080/login" ]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   nexus:
     image: sonatype/nexus3:3.46.0
     restart: unless-stopped
+    expose:
+      - 8081
     volumes:
       - nexus-data:/nexus-data
-    #  ports:
-    #  - 8081:8081
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:8081/" ]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
 
   nginx:
     image: nginx:1.22.1
@@ -47,13 +59,12 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
-      - nexus
-      - jenkins
-      # - gitlab
-
-      # secrets:
-      #   mysql_root_password:
-      #     file: mysql_root_passwd.txt
+      nexus:
+        condition: service_healthy
+      jenkins:
+        condition: service_healthy
+      gitlab:
+        condition: service_healthy
 
 volumes:
   gitlab-config: {}
