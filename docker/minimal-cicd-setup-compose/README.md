@@ -26,7 +26,9 @@ Minimal CI/CD setup (**jenkins**, **gitlab**, **nexus**) + (**nginx** as load ba
     # gitlab
     GITLAB_EXTERNAL_URL=http://gitlab.local
     ```
-3. Put the right wildcard certificate of the given domain in the previous step in `./nginx/certs/`
+3. Put the right wildcard certificate of the given domain in the previous step in `./nginx/certs/` which is used by nginx.
+
+**NOTE:** Nginx service is exposed on ports `80` and `443`.
 
 4. Bring up the services
     ```sh
