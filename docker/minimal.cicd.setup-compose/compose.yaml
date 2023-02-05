@@ -1,0 +1,81 @@
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:15.8.1-ce.0
+    restart: always
+    hostname: 'gitlab.local'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '${GITLAB_EXTERNAL_URL}'
+        # Add any other gitlab.rb configuration here, each on its own line
+    expose:
+      - 80
+      - 443
+      - 22
+    volumes:
+      - 'gitlab-config:/etc/gitlab'
+      - 'gitlab-logs:/var/log/gitlab'
+      - 'gitlab-data:/var/opt/gitlab'
+    shm_size: '256m'
+
+  jenkins:
+    image: jenkins/jenkins:2.389-jdk11
+    restart: unless-stopped
+    expose:
+      - 8080
+      - 50000
+    volumes:
+      - jenkins-data:/var/jenkins_home
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:8080/login" ]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  nexus:
+    image: sonatype/nexus3:3.46.0
+    restart: unless-stopped
+    expose:
+      - 8081
+      - 5000
+    volumes:
+      - nexus-data:/nexus-data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:8081/" ]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  nginx:
+    image: nginx:1.22.1
+    restart: unless-stopped
+    ports:
+      - 443:443
+      - 80:80
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      nexus:
+        condition: service_healthy
+      jenkins:
+        condition: service_healthy
+      gitlab:
+        condition: service_healthy
+    environment:
+      NGINX_CI_SERVER_NAME: ${NGINX_CI_SERVER_NAME:?error}
+      NGINX_CI_UPSTREAM_NAME: ${NGINX_CI_UPSTREAM_NAME:?error}
+      NGINX_GITLAB_SERVER_NAME: ${NGINX_GITLAB_SERVER_NAME:?error}
+      NGINX_GITLAB_UPSTREAM_NAME: ${NGINX_GITLAB_UPSTREAM_NAME:?error}
+      NGINX_REPO_SERVER_NAME: ${NGINX_REPO_SERVER_NAME:?error}
+      NGINX_REPO_UPSTREAM_NAME: ${NGINX_REPO_UPSTREAM_NAME:?error}
+    # env_file:
+    #   - .env
+
+volumes:
+  gitlab-config: {}
+  gitlab-logs: {}
+  gitlab-data: {}
+  jenkins-data: {}
+  nexus-data: {}
