@@ -1,0 +1,111 @@
+pipeline {
+  agent { label 'AgentLabel'}
+  options {
+    ansiColor('xterm')
+  }
+  environment {
+    SERVICE_NAME = 'myapp'
+    DEPLOY_ENV = 'dev'
+    DEFAULT_BRANCH = 'main'
+
+    REGISTRY_URL = 'repo.local
+    REGISTRY_CREDENTIAL_ID = 'docker-credential'
+
+    IMAGE_NAME = "${REGISTRY_URL}/${DEPLOY_ENV}/${SERVICE_NAME}"
+    IMAGE_NAME_TAG = "${IMAGE_NAME}:${BUILD_NUMBER}"
+
+    SONAR_PROJECT_KEY="${SERVICE_NAME}-project"
+    GIT_URL="https://git.local/myGroup"
+    GIT_CREDENTIAL_ID = 'git-credential'
+
+  }
+  parameters {
+    booleanParam(name: 'executeAcceptanceTest', defaultValue: false, description:'')
+  }
+
+  stages {
+    stage('Checkout SCM') {
+      steps {
+        script {
+          def scmVars
+          scmVars = git branch: "${DEFAULT_BRANCH}", credentialsId: "${GIT_CREDENTIAL_ID}", url: "${GIT_URL}/${SERVICE_NAME}.git"
+          env.GIT_COMMIT = scmVars.GIT_COMMIT
+        }
+      }
+    }
+
+    stage('Build Image') {
+      steps{
+        withEnv(['DOCKER_BUILDKIT=1']) {
+          sh """docker build -t ${IMAGE_NAME_TAG} --build-arg GIT_COMMIT=${env.GIT_COMMIT} --build-arg BUILD_NUMBER=${BUILD_NUMBER} . """
+        }
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      environment {
+        scannerHome = tool 'SonarServer'
+      }
+      steps {
+        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+          withSonarQubeEnv('SonarServer') {
+            sh """
+            ${scannerHome}/bin/sonar-scanner \
+            -D sonar.projectKey=${SONAR_PROJECT_KEY} \
+            -D sonar.projectBaseDir=${WORKSPACE} \
+            -D sonar.sources=${WORKSPACE} \
+            -D sonar.java.binaries=target
+            """
+          }
+        }
+      }
+    }
+    
+    stage("SonarQube Quality Gate") {
+      steps {
+        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+          timeout(time: 3, unit: 'MINUTES') {
+            waitForQualityGate webhookSecretId: 'sonar-secret', abortPipeline: false
+          }
+        }
+      }
+    }
+
+    stage('Push Image') {
+      steps{
+        withCredentials([usernamePassword(credentialsId: "$REGISTRY_CREDENTIAL", passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')]) {
+          sh """echo $DOCKER_PASSWD | docker login -u $DOCKER_USER --password-stdin $REGISTRY_URL """
+        } 
+        sh """
+          docker image tag ${IMAGE_NAME_TAG} ${IMAGE_NAME}:latest \
+          docker push ${IMAGE_NAME_TAG} \
+          docker push ${IMAGE_NAME}:latest
+        """
+      }
+    }
+    
+    stage('Deploy') {
+      steps{
+        echo "Deploy to ${DEPLOY_ENV}"
+        sh "scp compose.yaml ${DEPLOY_ENV}:/tmp/compose.yaml"
+        sh "docker context use ${DEPLOY_ENV}"
+        withCredentials([usernamePassword(credentialsId: "$REGISTRY_CREDENTIAL", passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')]) {
+          sh """echo $DOCKER_PASSWD | docker login -u $DOCKER_USER --password-stdin $REGISTRY_URL """
+        } 
+        sh "docker compose -f /tmp/compose.yaml up --force-recreate -d"
+      }
+    }
+  }
+  post {
+    always{
+        emailext (
+        subject: "'Jenkins Build Result' - Job: ${env.JOB_NAME} - Status: ${currentBuild.currentResult}",
+        recipientProviders: [[$class: 'CulpritsRecipientProvider'],[$class: 'RequesterRecipientProvider']],
+        body: "Job: ${env.JOB_NAME} Build_Number: ${env.BUILD_NUMBER} Status: ${currentBuild.currentResult}\nFor more info visit: ${env.BUILD_URL}.\nBuild log is attached!",
+        attachLog: true)
+    }
+    success {
+      cleanWs()
+    }
+  }
+}
