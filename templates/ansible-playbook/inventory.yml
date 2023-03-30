@@ -1,0 +1,16 @@
+all:
+  hosts:
+    local:
+      ansible_host: 127.0.0.1
+      ansible_user: uzziel # local username
+      ansible_ssh_private_key_file: ~/.ssh/gitlab_ed25519 # Path to ssh key file
+  children:
+    children_groupname:
+      hosts:
+        child1:
+          ansible_host: x.x.x.x # child1 hostname or IP
+        child2:
+          ansible_host: y.y.y.y # child2 hostname or IP
+      vars:
+        ansible_user: root # remote user username
+        ansible_ssh_private_key_file: ~/.ssh/ed25519 # Path to children_group common ssh key file

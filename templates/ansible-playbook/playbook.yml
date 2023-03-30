@@ -1,0 +1,232 @@
+# - name: debugging play
+#   hosts: local
+#   gather_facts: true
+#   vars:
+#   tasks:
+#     - name: show gatehred facts
+#       debug:
+#         var: ansible_facts
+
+#     - name: check type of data
+#       debug:
+#         var: ansible_facts["all_ipv6_addresses"]|type_debug
+
+# - name: processes
+#   hosts: local
+#   gather_facts: false
+#   tasks:
+#     - name: long running process
+#       shell: sleep 5 && echo finished
+#       async: 20
+#       poll: 0
+#       register: long_running
+
+#     - name: Check on long running process async task
+#       async_status:
+#         jid: "{{ long_running.ansible_job_id }}"
+#       register: job_result
+#       until: job_result.finished
+#       retries: 10
+#       delay: 3
+
+#     - name: execute command
+#       command: echo running echo
+#       register: shell_output
+#     - name: print execute shell command job's return values
+#       debug: msg={{long_running}}
+
+# - name: file operations
+#   hosts: local
+#   gather_facts: false
+#   tasks:
+#     - name: find file
+#       become: true
+#       become_user: root
+#       find:
+#         paths: /etc
+#         patterns: "iptables"
+#         file_type: directory
+#         use_regex: true
+#         recurse: true
+#       register: find_result
+#     - debug: msg={{find_result}}
+
+#     - name: check file stat
+#       stat:
+#         path: /etc/resolv.conff
+#       register: stat_result
+#     # - debug: msg={{stat_result}}
+#     - name: do if condition is true(file exists)
+#       command: cat /etc/resolv.conff
+#       when: stat_result.stat.exists
+
+#     - name: add/change a block in file
+#       ansible.builtin.blockinfile:
+#         create: true
+#         path: /tmp/haha
+#         block: |
+#           this is the new shit. stand up and admit.
+#           second line - {{ansible_facts.distribution}}
+#     - name: change only one line in file
+#       ansible.builtin.lineinfile:
+#         path: /tmp/haha
+#         regexp: "^second"
+#         line: "second line: ansible_facts.distribution: {{ansible_facts.distribution}}"
+
+#     - name: change ownership
+#       become: true
+#       become_user: root
+#       file:
+#         path: /tmp/haha
+#         state: file
+#         owner: 1000
+#         group: 1002
+#         # state: directory
+#         # recurse: true
+
+# - name: user operations
+#   hosts: local
+#   gather_facts: false
+#   become: true
+#   tasks:
+#     - name: create group
+#       group:
+#         name: developers
+#         state: present
+
+#     - name: create user
+#       user:
+#         name: bob
+#         group: developers
+
+#     - name: delete user
+#       user: name=bob remove=true state=absent
+
+#     - name: delete group
+#       group: name=developers state=absent
+
+#     - name: usermod -aG docker bob
+#       user:
+#         name: bob
+#         groups: docker
+#         append: true
+
+# - name: docker
+#   hosts: local
+#   gather_facts: true
+#   vars_files:
+#     - vars.yml
+#   tasks:
+#     - name: get container info
+#       community.docker.docker_container_info:
+#         name: debian
+#       register: container_result
+#     - debug: msg={{container_result}}
+
+#     - name: install python docker module
+#       ansible.builtin.pip:
+#         name:
+#           - docker
+#           - docker-compose
+
+#     - name: login to a docker registry
+#       community.docker.docker_login:
+#         registry_url: https://index.docker.io/v1/
+#         username: "{{registry_username}}"
+#         password: "{{registry_password}}"
+
+#     - name: docker compose up -d
+#       community.docker.docker_compose:
+#         project_src: "path to docker-compose.yaml directory"
+#         state: present
+
+# - name: kubernetes
+#   hosts: local
+#   tasks:
+#     - name: Create a k8s namespace
+#       kubernetes.core.k8s:
+#         name: testing
+#         api_version: v1
+#         kind: Namespace
+#         state: absent
+#       register: k8s_result
+#     - debug: msg={{k8s_result}}
+
+- name: OTHER
+  hosts: local
+  gather_facts: true
+  tasks:
+    - name: Wait for port 8000 to become open on the host, don't start checking for 10 seconds
+      ansible.builtin.wait_for:
+        port: 8000
+        delay: 10
+
+    - name: use python2 interpreter to install python3 on a RHEL distro (like CentOS, Rocky Linux and Oracle)
+      vars:
+        ansible_python_interpreter: /usr/bin/python
+      yum:
+        name: python3
+        update_cache: true
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Get public IPv4 address
+      uri:
+        url: "https://ipv4.icanhazip.com/"
+        return_content: true
+      register: ipv4_address_raw
+    - name: Get public IPv6 address
+      uri:
+        url: "https://ipv6.icanhazip.com/"
+        return_content: true
+      ignore_errors: true
+      register: ipv6_address_raw
+    - name: Extract public IPv4 and IPv6 addresses
+      set_fact:
+        ipv4_address: "{{ ipv4_address_raw.content | regex_replace('\\n', '') }}"
+        ipv6_address: "{{ ipv6_address_raw.content | regex_replace('\\n', '') }}"
+
+    - name: "Determine if the apache package is installed"
+      register: httpd_version
+      shell: httpd -V
+    - name: Ensure Apache is at the Latest version
+      become: true
+      become_user: root
+      community.general.pacman:
+        name: apache
+        state: latest
+      when: "'server' in httpd_version.stdout"
+
+    - name: "Start the Apache HTTPD Server"
+      become: true
+      become_user: root
+      register: starthttpdout
+      shell: "httpd -k start"
+      changed_when: "'already running' not in starthttpdout.stdout"
+    - name: "shut down CentOS 6 and Debian 7 systems"
+      command: /sbin/shutdown -t now
+      when:
+        (ansible_distribution == "CentOS" and ansible_distribution_major_version == "6") or
+        (ansible_distribution == "Debian" and ansible_distribution_major_version == "7")
+
+    - name: Install a package with pacman when the disto is arch
+      become: true
+      community.general.pacman:
+        name: shellcheck
+        state: latest
+        update_cache: true
+      when: ansible_facts.distribution == "Archlinux"
+
+    - name: Reconnect to the Server
+      meta: reset_connection
+
+    - name: run inline commands
+      command: echo -e "This is an inline command execution `uname -a`:\n    {{lookup('pipe', 'uname -a')}}"
+      register: command_result
+    - debug: msg={{command_result.stdout_lines}}
+
+    - name: generate random string with given charset
+      ansible.builtin.debug:
+        msg: "{{ lookup('community.general.random_string', length=10, min_lower=10) }}"
+      vars:
+        charset: 'abcdefghijklmnopqrstuvwxyz'
