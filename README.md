@@ -2,7 +2,7 @@
 
 ## What is this?
 
-This repo contains anything possibly related to devops tooling (Dockerfile, Jenkinsfile, docker-compose, terraform.tf)
+This repo contains anything possibly related to devops tooling (Dockerfile, Jenkinsfile, docker-compose, playbooks, terraform.tf)
 
 ## What are there?
 
@@ -15,3 +15,4 @@ This repo contains anything possibly related to devops tooling (Dockerfile, Jenk
 - Template files:
   - **jenkins pilpeline** | [`Jenkinsfile`](/templates/Jenkinsfile)
   - **GNU's Makefile** | [`Makefile`](/templates/Makefile)
+  - **ansible playbook** | [`playbook.yml`](/templates/ansible-playbook)
