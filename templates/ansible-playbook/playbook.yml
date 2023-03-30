@@ -223,7 +223,8 @@
     - name: run inline commands
       command: echo -e "This is an inline command execution `uname -a`:\n    {{lookup('pipe', 'uname -a')}}"
       register: command_result
-    - debug: msg={{command_result.stdout_lines}}
+    - name: debug run inline commands
+      debug: msg={{command_result.stdout_lines}}
 
     - name: generate random string with given charset
       ansible.builtin.debug:
