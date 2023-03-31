@@ -16,3 +16,4 @@ This repo contains anything possibly related to devops tooling (Dockerfile, Jenk
   - **jenkins pilpeline** | [`Jenkinsfile`](/templates/Jenkinsfile)
   - **GNU's Makefile** | [`Makefile`](/templates/Makefile)
   - **ansible playbook** | [`playbook.yml`](/templates/ansible-playbook)
+  - **HAProxy config** | [`haproxy.cfg`](/templates/haproxy.cfg)
