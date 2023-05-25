@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  # annotations:
+  # nginx.ingress.kubernetes.io/rewrite-target: /$2
+  # kubernetes.io/ingress.class: haproxy
+spec:
+  rules:
+    - host: nginx.kube
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              # specifies where the requests should be forwarded to after being received by the Ingress controller.
+              service:
+                name: nginx-svc
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - nginx.kube
+      secretName: dot-kube-tls

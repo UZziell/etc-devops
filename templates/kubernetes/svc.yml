@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+spec:
+  # Enables session affinity based on the client's IP address.
+  # Other option is None which turns off sessionAffinity
+  sessionAffinity: ClientIP
+  # Controls how incoming traffic from outside the cluster is distributed to the pods backing the service
+  # If it's set to Local, the service's load balancer routes incoming traffic to a pod on the same node where the traffic enters the cluster.
+  # externalTrafficPolicy: Local
+  selector:
+    app: nginx
+  # type: NodePort
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      nodePort: 30003
+      targetPort: 80
+    - name: https
+      # if nodePort is not specified, API server assigns one from the configured range (default: 30000-32767)
+      port: 443
+      targetPort: 443

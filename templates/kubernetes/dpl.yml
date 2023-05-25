@@ -1,0 +1,191 @@
+# Every manifest file has four parts
+#  - apiVersion and kind: defines the type of the resource
+#  - metadata: data describing the resource
+#  - spec: spec of resource
+#  - status: the current state of resource which is always filled by k8s itself
+
+# All available resources and their current apiVersion can be found be `kubectl api-resources` command
+# The format of apiVersion is ({api_Group}/)?{Version}
+# Here the deployment resource is part of 'apps' apiGroup which currently has a stable 'v1' version
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deploy
+# spec field totally depends on the kind of resource.
+# `kubectl explain {KIND}(.{FIELD})?` command can be used to find more info about each resource and it's spec field
+spec:
+  # Selectors and Lables are how deployments, replicaSets, replicationControllers, services and ... find out which pods they should manage or relate to
+  # Here a deployment is defined to match any pod with 'app: nginx' label.
+  selector:
+    matchLabels:
+      app: nginx
+  ## these fileds are spicific to Deployment kind
+  # Specifies how long a newly created pod should be ready before the pod is treated as available
+  minReadySeconds: 20
+  # Specifies how many revisions(replicaSets) should be kept (which allows undoing a rollout)
+  revisionHistoryLimit: 10
+  # The time after which the Deployment is considered failed if not progressing
+  progressDeadlineSeconds: 600
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Determines how many pod instances you allow to exist above the desired replica count
+      maxSurge: 25%
+      # Determines how many pod instances can be unavailable relative to the desired replica count.
+      # To update pods one at a time, use maxUnavailable=0
+      maxUnavailable: 25%
+  # Some resources like deployments and replicaSets define other resources like pods within them.
+  # Here the template is actually the definition of a pod with it's own 'metadata' and 'spec' fields
+  template:
+    metadata:
+      # the pod has the label 'app: nginx' so the deployment can find it
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.23.4
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            # Using variables in container arguments
+            - sed -i "1i ======${HOSTNAME}- -${VARIABLE_NAME}======" /usr/share/nginx/html/index.html;
+              touch /tmp/ready;
+              nginx -g 'daemon off;'
+          env:
+            # Infile variable
+            - name: VARIABLE_NAME
+              value: variable_value
+            # Variable from a ConfigMap
+            - name: VARIABLE_FROM_CONFIGMAP
+              valueFrom:
+                configMapKeyRef:
+                  name: nginx-cm
+                  key: foo
+            # Variable from a Secret
+            - name: SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nginx-secret
+                  key: passwd
+            # Variable from pod's metadata using Downward API
+            - name: SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            # Variable from pod's CPU resource request using Downward API
+            - name: CONTAINER_CPU_REQUEST_MILLICORES
+              valueFrom:
+                resourceFieldRef:
+                  resource: requests.cpu
+                  divisor: 1m
+            # Variable from pod's Memory resource limit using Downward API
+            - name: CONTAINER_MEMORY_LIMIT_KIBIBYTES
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+                  divisor: 1Ki
+          # Multiple variables from ConfigMap (optionally prefixed with 'CONFIG_')
+          envFrom:
+            - prefix: CONFIG_
+              configMapRef:
+                name: nginx-cm
+          # liveness checks if the container needs to be restarted or not.
+          livenessProbe:
+            # Check liveness by sending an HTTP GET. 2xx 3xx status codes are considered successful
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          # readiness checks if the container is ready to serve incoming requests from a service
+          readinessProbe:
+            # Check readiness by executing a command (any exit code other than 0 is a failure)
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ls /tmp/ready
+            periodSeconds: 5
+          # Resourses request and limit
+          resources:
+            # minimum amount of resources that the container requires. (It's used by scheduler to determine the proper node)
+            requests:
+              memory: "128Mi"
+              cpu: "200m"
+            # maximum amount of resources that a container is allowed to consume
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          # This is for informational purposes and documentation within the Pod manifest
+          ports:
+            - containerPort: 80
+          # Pod's volume mounts. References mounts already defined in the volumes filed of Pod.
+          volumeMounts:
+            # This volume is shared with other container in the pod and is mounted under /usr/share/nginx/html
+            - name: shared-volume
+              mountPath: /usr/share/nginx/html
+            - name: nginx-pvc
+              mountPath: /tmp/pvc
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            # Mounting only a file from a volume with multiple files
+            - name: nginx-config
+              mountPath: /tmp/haha/foo_file
+              subPath: foofile
+            - name: nginx-https
+              mountPath: /etc/nginx/certs/
+            # Mounting downward API volume is just like other ones
+            - name: downward
+              mountPath: /etc/downwardapi
+        # This is how to have another more than one container on a Pod
+        - image: luksa/fortune
+          imagePullPolicy: IfNotPresent
+          name: html-generator
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          volumeMounts:
+            # This volume is shared with other container in the pod and is mounted under /var/htdocs
+            - name: shared-volume
+              mountPath: /var/htdocs
+      # determines how DNS resolution is performed for containers within the Pod
+      dnsPolicy: ClusterFirst
+      volumes:
+        # emptyDir volume to be shared between two containers
+        - name: shared-volume
+          emptyDir:
+            medium: Memory
+        - name: nginx-pvc
+          persistentVolumeClaim:
+            claimName: nginx-pvc
+        # Choosing only two items (by using their keys) from configMap rather than all the files/variables
+        - name: nginx-config
+          configMap:
+            name: nginx-cm
+            items:
+              - key: nginx.conf
+                path: renamed-nginx.conf
+              - key: foo
+                path: foofile
+        - name: nginx-https
+          secret:
+            secretName: nginx-secret
+        # Labels and Annotations can only be exposed using volumes not environment variables.
+        - name: downward
+          downwardAPI:
+            items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations
+              - path: "containerCpuRequestMilliCores"
+                resourceFieldRef:
+                  containerName: nginx
+                  resource: requests.cpu
+                  divisor: 1m

@@ -13,6 +13,11 @@ This repo contains anything possibly related to devops tooling (Dockerfile, Jenk
 - A jenkins shared library that fetches docker image names and tags from a given registry by using docker registry API and returns the result as jenkins build parameters [[jenkins-shared-library]](/jenkins-shared-library/)
 
 - Template files:
+  - **Kubernetes**
+    - **Deployment** | [`dpl.yml`](templates/kubernetes/dpl.yml)
+    - **configMap** | [`cm.yml`](templates/kubernetes/cm.yml)
+    - **Service** | [`svc.yml`](templates/kubernetes/svc.yml)
+    - **Ingress** | [`ingress.yml`](templates/kubernetes/ingress.yml)
   - **jenkins pilpeline** | [`Jenkinsfile`](/templates/Jenkinsfile)
   - **GNU's Makefile** | [`Makefile`](/templates/Makefile)
   - **ansible playbook** | [`playbook.yml`](/templates/ansible-playbook)

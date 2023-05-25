@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-cm
+data:
+  # value can be a single word string
+  foo: bazzzzzz
+  # value can also be a multi-line string
+  nginx.conf: |
+    server {
+      listen       80;
+      listen       443 ssl;
+      server_name  .kube;
+
+      ssl_certificate certs/cert.pem;
+      ssl_certificate_key certs/cert.key;
+      # ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+      ssl_ciphers HIGH:!aNULL:!MD5;
+
+      location / {
+          root   /usr/share/nginx/html;
+          index  index.html index.htm;
+      }
+      error_page   500 502 503 504  /50x.html;
+      location = /50x.html {
+          root   /usr/share/nginx/html;
+      }
+    }
