@@ -33,7 +33,7 @@ services:
       start_period: 60s
 
   nexus:
-    image: sonatype/nexus3:3.46.0
+    image: sonatype/nexus3:3.65.0
     restart: unless-stopped
     expose:
       - 8081
@@ -41,14 +41,14 @@ services:
     volumes:
       - nexus-data:/nexus-data
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://127.0.0.1:8081/" ]
-      interval: 1m30s
+      test: [ "CMD", "curl", "--fail", "http://127.0.0.1:8081/service/rest/v1/status" ]
+      interval: 30s
       timeout: 5s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 30s
 
   nginx:
-    image: nginx:1.22.1
+    image: nginx:1.25.3-bookworm
     restart: unless-stopped
     ports:
       - 443:443
