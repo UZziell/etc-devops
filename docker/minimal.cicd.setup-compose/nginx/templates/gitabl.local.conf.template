@@ -1,5 +1,6 @@
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name ${NGINX_GITLAB_SERVER_NAME};
     proxy_read_timeout 90;
     client_max_body_size 0;
