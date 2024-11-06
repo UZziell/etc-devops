@@ -2,8 +2,9 @@ upstream nexus {
     server ${NGINX_REPO_UPSTREAM_NAME}:8081;
 }
 
+# the docker group registry (containing both proxy and hosted regsitry)
 upstream registry {
-    server ${NGINX_REPO_UPSTREAM_NAME}:5000;
+    server ${NGINX_REPO_UPSTREAM_NAME}:5001;
 }
 
 server {
@@ -43,12 +44,10 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto "https";
     }
-
 }
 
 server {
     listen 80;
     server_name ${NGINX_REPO_SERVER_NAME};
     return 301 https://$host$request_uri;
-
 }
