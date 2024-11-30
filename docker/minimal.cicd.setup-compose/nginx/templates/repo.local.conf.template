@@ -2,9 +2,20 @@ upstream nexus {
     server ${NGINX_REPO_UPSTREAM_NAME}:8081;
 }
 
-# the docker group registry (containing both proxy and hosted regsitry)
-upstream registry {
+# the hosted docker registry
+upstream docker-hosted {
+    server ${NGINX_REPO_UPSTREAM_NAME}:5000;
+}
+
+# the group docker registry
+upstream docker-group {
     server ${NGINX_REPO_UPSTREAM_NAME}:5001;
+}
+
+map $request_method:$http_user_agent $backend {
+    default                                  http://nexus;
+    "~*(POST|PUT|PATCH|HEAD):.*docker.*"     http://docker-hosted;
+    "~*GET:.*docker.*"                       http://docker-group;
 }
 
 server {
@@ -34,11 +45,7 @@ server {
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     location / {
-        # proxy to docker registry if the userAgent was docker
-        if ($http_user_agent ~ docker ) {
-            proxy_pass http://registry;
-        }
-        proxy_pass http://nexus;
+        proxy_pass $backend;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
