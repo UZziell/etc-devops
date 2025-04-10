@@ -14,8 +14,8 @@ upstream docker-group {
 
 map $request_method:$http_user_agent $backend {
     default                                  http://nexus;
-    "~*(POST|PUT|PATCH|HEAD):.*docker.*"     http://docker-hosted;
-    "~*GET:.*docker.*"                       http://docker-group;
+    "~*(POST|PUT|PATCH|HEAD):.*(docker|containerd|cri).*"     http://docker-hosted;
+    "~*GET:.*(docker|containerd|cri).*"                       http://docker-group;
 }
 
 server {
